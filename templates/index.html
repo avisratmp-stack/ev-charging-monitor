@@ -1,0 +1,836 @@
+<!DOCTYPE html>
+<html lang="he" dir="rtl">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0, viewport-fit=cover">
+    <title>EV Charging Monitor</title>
+    <link rel="manifest" href="/static/manifest.json">
+    <meta name="theme-color" content="#0f766e">
+    <meta name="apple-mobile-web-app-capable" content="yes">
+    <meta name="apple-mobile-web-app-status-bar-style" content="default">
+    <link rel="apple-touch-icon" href="/static/icon-192.png">
+    <link rel="preconnect" href="https://fonts.googleapis.com">
+    <link href="https://fonts.googleapis.com/css2?family=Heebo:wght@300;400;500;600;700&display=swap" rel="stylesheet">
+    <style>
+        *, *::before, *::after { box-sizing: border-box; margin: 0; padding: 0; }
+
+        :root {
+            --bg-primary: #f5f7fa;
+            --bg-secondary: #ffffff;
+            --bg-tertiary: #eef1f6;
+            --bg-hover: #e8ecf2;
+            --text-primary: #1a202c;
+            --text-secondary: #4a5568;
+            --text-muted: #a0aec0;
+            --border: #e2e8f0;
+            --accent: #0f766e;
+            --accent-light: #0d9488;
+            --available: #059669;
+            --available-bg: rgba(5, 150, 105, 0.08);
+            --available-glow: rgba(5, 150, 105, 0.2);
+            --in-use: #dc2626;
+            --in-use-bg: rgba(220, 38, 38, 0.07);
+            --in-use-glow: rgba(220, 38, 38, 0.15);
+            --unknown: #d97706;
+            --unknown-bg: rgba(217, 119, 6, 0.07);
+            --error: #dc2626;
+            --radius: 16px;
+            --radius-sm: 10px;
+            --radius-xs: 6px;
+        }
+
+        html { font-size: 16px; }
+        body {
+            font-family: 'Heebo', sans-serif;
+            background: var(--bg-primary);
+            color: var(--text-primary);
+            min-height: 100vh;
+            min-height: 100dvh;
+            -webkit-font-smoothing: antialiased;
+        }
+
+        /* --- Header --- */
+        .header {
+            background: var(--bg-secondary);
+            border-bottom: 1px solid var(--border);
+            padding: 16px 20px;
+            position: sticky;
+            top: 0;
+            z-index: 100;
+            backdrop-filter: blur(12px);
+        }
+        .header-inner {
+            max-width: 1200px;
+            margin: 0 auto;
+            display: flex;
+            align-items: center;
+            justify-content: space-between;
+        }
+        .header-title {
+            display: flex;
+            align-items: center;
+            gap: 12px;
+        }
+        .header-title svg {
+            width: 28px;
+            height: 28px;
+            color: var(--accent-light);
+        }
+        .header-title h1 {
+            font-size: 1.15rem;
+            font-weight: 600;
+            letter-spacing: -0.02em;
+        }
+        .connection-badge {
+            display: flex;
+            align-items: center;
+            gap: 6px;
+            font-size: 0.75rem;
+            color: var(--text-secondary);
+            background: var(--bg-tertiary);
+            padding: 5px 12px;
+            border-radius: 20px;
+        }
+        .connection-dot {
+            width: 7px;
+            height: 7px;
+            border-radius: 50%;
+            background: var(--unknown);
+            transition: background 0.3s;
+        }
+        .connection-dot.connected { background: var(--available); }
+        .connection-dot.disconnected { background: var(--error); }
+
+        /* --- Main Layout --- */
+        .main-container {
+            max-width: 1200px;
+            margin: 0 auto;
+            padding: 20px;
+        }
+        .main-layout {
+            display: flex;
+            flex-direction: column;
+            gap: 24px;
+        }
+        @media (min-width: 1024px) {
+            .main-layout {
+                flex-direction: row;
+            }
+            .main-left { flex: 1; min-width: 0; }
+            .main-right { width: 360px; flex-shrink: 0; }
+        }
+
+        /* --- Station Cards Grid --- */
+        .stations-grid {
+            display: grid;
+            grid-template-columns: 1fr;
+            gap: 16px;
+        }
+        @media (min-width: 520px) {
+            .stations-grid {
+                grid-template-columns: 1fr 1fr;
+            }
+        }
+
+        /* --- Station Card --- */
+        .station-card {
+            background: var(--bg-secondary);
+            border: 1px solid var(--border);
+            border-radius: var(--radius);
+            overflow: hidden;
+            transition: transform 0.2s, box-shadow 0.3s, border-color 0.3s;
+            position: relative;
+            box-shadow: 0 1px 3px rgba(0,0,0,0.04);
+        }
+        .station-card:hover {
+            transform: translateY(-2px);
+            box-shadow: 0 4px 16px rgba(0,0,0,0.08);
+        }
+        .card-status-bar {
+            height: 4px;
+            background: var(--text-muted);
+            transition: background 0.4s;
+        }
+        .station-card.status-available .card-status-bar { background: var(--available); }
+        .station-card.status-in-use .card-status-bar { background: var(--in-use); }
+        .station-card.status-unknown .card-status-bar,
+        .station-card.status-error .card-status-bar { background: var(--unknown); }
+
+        .station-card.status-available {
+            border-color: rgba(5, 150, 105, 0.35);
+            box-shadow: 0 0 20px var(--available-glow), 0 2px 12px rgba(0,0,0,0.06);
+        }
+        .station-card.status-in-use {
+            border-color: rgba(220, 38, 38, 0.2);
+        }
+
+        .card-content {
+            padding: 20px;
+        }
+        .card-header {
+            display: flex;
+            justify-content: space-between;
+            align-items: flex-start;
+            gap: 12px;
+            margin-bottom: 16px;
+        }
+        .station-name {
+            font-size: 1.05rem;
+            font-weight: 600;
+            margin-bottom: 4px;
+        }
+        .station-address {
+            font-size: 0.8rem;
+            color: var(--text-secondary);
+        }
+
+        /* --- Status Pill --- */
+        .status-pill {
+            display: flex;
+            align-items: center;
+            gap: 7px;
+            padding: 6px 14px;
+            border-radius: 20px;
+            font-size: 0.78rem;
+            font-weight: 500;
+            white-space: nowrap;
+            background: var(--bg-tertiary);
+            color: var(--text-secondary);
+            transition: background 0.3s, color 0.3s;
+        }
+        .status-available .status-pill {
+            background: var(--available-bg);
+            color: var(--available);
+        }
+        .status-in-use .status-pill {
+            background: var(--in-use-bg);
+            color: var(--in-use);
+        }
+        .status-unknown .status-pill,
+        .status-error .status-pill {
+            background: var(--unknown-bg);
+            color: var(--unknown);
+        }
+
+        .status-dot {
+            width: 8px;
+            height: 8px;
+            border-radius: 50%;
+            background: currentColor;
+            flex-shrink: 0;
+        }
+        .status-available .status-dot {
+            animation: pulse-dot 2s ease-in-out infinite;
+        }
+        @keyframes pulse-dot {
+            0%, 100% { opacity: 1; box-shadow: 0 0 0 0 currentColor; }
+            50% { opacity: 0.7; box-shadow: 0 0 0 6px transparent; }
+        }
+
+        .card-meta {
+            display: flex;
+            justify-content: space-between;
+            align-items: center;
+            font-size: 0.75rem;
+            color: var(--text-muted);
+        }
+        .last-check {
+            direction: ltr;
+        }
+
+        /* --- Controls Panel --- */
+        .controls-panel {
+            background: var(--bg-secondary);
+            border: 1px solid var(--border);
+            border-radius: var(--radius);
+            padding: 18px 20px;
+            display: flex;
+            flex-wrap: wrap;
+            gap: 16px;
+            align-items: center;
+        }
+        .controls-title {
+            font-size: 0.85rem;
+            font-weight: 500;
+            color: var(--text-secondary);
+            width: 100%;
+            margin-bottom: 2px;
+        }
+        .toggle-control {
+            display: flex;
+            align-items: center;
+            gap: 10px;
+            font-size: 0.85rem;
+            cursor: pointer;
+            user-select: none;
+            color: var(--text-primary);
+        }
+        .toggle-control input { display: none; }
+        .toggle-slider {
+            width: 40px;
+            height: 22px;
+            border-radius: 11px;
+            background: var(--bg-tertiary);
+            border: 1px solid var(--border);
+            position: relative;
+            transition: background 0.2s, border-color 0.2s;
+        }
+        .toggle-slider::after {
+            content: '';
+            position: absolute;
+            top: 2px;
+            right: 2px;
+            width: 16px;
+            height: 16px;
+            border-radius: 50%;
+            background: var(--text-muted);
+            transition: transform 0.2s, background 0.2s;
+        }
+        .toggle-control input:checked + .toggle-slider {
+            background: var(--accent);
+            border-color: var(--accent);
+        }
+        .toggle-control input:checked + .toggle-slider::after {
+            transform: translateX(-18px);
+            background: #fff;
+        }
+        .test-btn {
+            background: var(--bg-tertiary);
+            border: 1px solid var(--border);
+            color: var(--text-secondary);
+            padding: 6px 14px;
+            border-radius: var(--radius-xs);
+            font-size: 0.78rem;
+            font-family: inherit;
+            cursor: pointer;
+            transition: background 0.2s, color 0.2s;
+        }
+        .test-btn:hover {
+            background: var(--bg-hover);
+            color: var(--text-primary);
+        }
+
+        /* --- Log Panel --- */
+        .log-panel {
+            background: var(--bg-secondary);
+            border: 1px solid var(--border);
+            border-radius: var(--radius);
+            overflow: hidden;
+        }
+        .log-header {
+            padding: 16px 20px 12px;
+            font-size: 0.9rem;
+            font-weight: 600;
+            border-bottom: 1px solid var(--border);
+            display: flex;
+            align-items: center;
+            justify-content: space-between;
+        }
+        .log-count {
+            font-size: 0.72rem;
+            font-weight: 400;
+            color: var(--text-muted);
+        }
+        .log-entries {
+            max-height: 400px;
+            overflow-y: auto;
+            scrollbar-width: thin;
+            scrollbar-color: var(--bg-tertiary) transparent;
+        }
+        .log-entries::-webkit-scrollbar { width: 5px; }
+        .log-entries::-webkit-scrollbar-track { background: transparent; }
+        .log-entries::-webkit-scrollbar-thumb { background: var(--bg-tertiary); border-radius: 3px; }
+
+        .log-entry {
+            display: flex;
+            align-items: center;
+            gap: 10px;
+            padding: 10px 20px;
+            border-bottom: 1px solid var(--border);
+            font-size: 0.8rem;
+            transition: background 0.2s;
+            animation: fadeIn 0.3s ease;
+        }
+        .log-entry:hover { background: var(--bg-tertiary); }
+        .log-entry:last-child { border-bottom: none; }
+
+        @keyframes fadeIn {
+            from { opacity: 0; transform: translateY(-4px); }
+            to { opacity: 1; transform: translateY(0); }
+        }
+
+        .log-time {
+            font-variant-numeric: tabular-nums;
+            color: var(--text-muted);
+            font-size: 0.75rem;
+            direction: ltr;
+            min-width: 65px;
+            flex-shrink: 0;
+        }
+        .log-dot {
+            width: 7px;
+            height: 7px;
+            border-radius: 50%;
+            flex-shrink: 0;
+        }
+        .log-dot.available { background: var(--available); }
+        .log-dot.in-use { background: var(--in-use); }
+        .log-dot.unknown { background: var(--unknown); }
+        .log-text {
+            color: var(--text-secondary);
+        }
+        .log-text strong {
+            color: var(--text-primary);
+            font-weight: 500;
+        }
+
+        .log-empty {
+            padding: 40px 20px;
+            text-align: center;
+            color: var(--text-muted);
+            font-size: 0.82rem;
+        }
+
+        /* --- Animations --- */
+        .station-card.flash-available {
+            animation: flashGreen 1.5s ease;
+        }
+        @keyframes flashGreen {
+            0% { box-shadow: 0 0 0 0 var(--available-glow); }
+            30% { box-shadow: 0 0 40px 8px var(--available-glow); }
+            100% { box-shadow: 0 0 20px var(--available-glow), 0 2px 12px rgba(0,0,0,0.06); }
+        }
+
+        /* --- Responsive adjustments --- */
+        @media (max-width: 519px) {
+            .card-content { padding: 16px; }
+            .station-name { font-size: 0.95rem; }
+            .main-container { padding: 12px; }
+            .header { padding: 12px 16px; }
+        }
+
+        @media (min-width: 1024px) {
+            .log-panel {
+                position: sticky;
+                top: 80px;
+            }
+            .log-entries {
+                max-height: calc(100vh - 200px);
+            }
+        }
+
+        /* --- Progress Bar --- */
+        .cycle-bar-wrap {
+            background: var(--bg-secondary);
+            border-bottom: 1px solid var(--border);
+            padding: 8px 20px;
+        }
+        .cycle-bar-inner {
+            max-width: 1200px;
+            margin: 0 auto;
+            display: flex;
+            align-items: center;
+            gap: 12px;
+        }
+        .cycle-label {
+            font-size: 0.72rem;
+            color: var(--text-muted);
+            white-space: nowrap;
+            min-width: 110px;
+        }
+        .cycle-track {
+            flex: 1;
+            height: 6px;
+            background: var(--bg-tertiary);
+            border-radius: 3px;
+            overflow: hidden;
+        }
+        .cycle-fill {
+            height: 100%;
+            width: 0%;
+            background: var(--accent-light);
+            border-radius: 3px;
+            transition: width 1s linear;
+        }
+        .cycle-fill.scanning {
+            background: var(--unknown);
+            animation: scan-pulse 1.5s ease-in-out infinite;
+        }
+        @keyframes scan-pulse {
+            0%, 100% { opacity: 1; }
+            50% { opacity: 0.5; }
+        }
+        .cycle-time {
+            font-size: 0.72rem;
+            color: var(--text-muted);
+            font-variant-numeric: tabular-nums;
+            min-width: 30px;
+            text-align: left;
+            direction: ltr;
+        }
+    </style>
+</head>
+<body>
+    <!-- Header -->
+    <header class="header">
+        <div class="header-inner">
+            <div class="header-title">
+                <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
+                    <path d="M13 2L3 14h9l-1 8 10-12h-9l1-8z"/>
+                </svg>
+                <h1>EV Charging Monitor</h1>
+            </div>
+            <div class="connection-badge">
+                <span class="connection-dot" id="connDot"></span>
+                <span id="connText">Connecting...</span>
+            </div>
+        </div>
+    </header>
+
+    <!-- Cycle Progress Bar -->
+    <div class="cycle-bar-wrap">
+        <div class="cycle-bar-inner">
+            <span class="cycle-label" id="cycleLabel">Scanning stations...</span>
+            <div class="cycle-track">
+                <div class="cycle-fill scanning" id="cycleFill"></div>
+            </div>
+            <span class="cycle-time" id="cycleTime"></span>
+        </div>
+    </div>
+
+    <!-- Main -->
+    <div class="main-container">
+        <div class="main-layout">
+            <!-- Left: Cards + Controls -->
+            <div class="main-left">
+                <!-- Station Cards -->
+                <div class="stations-grid">
+                    {% for station in stations %}
+                    <div class="station-card" data-station-id="{{ station.id }}">
+                        <div class="card-status-bar"></div>
+                        <div class="card-content">
+                            <div class="card-header">
+                                <div class="station-info">
+                                    <div class="station-name">{{ station.name_he }}</div>
+                                    <div class="station-address">{{ station.address }}</div>
+                                </div>
+                                <div class="status-pill">
+                                    <span class="status-dot"></span>
+                                    <span class="status-text">Checking...</span>
+                                </div>
+                            </div>
+                            <div class="card-meta">
+                                <span class="last-check">Waiting for first check...</span>
+                            </div>
+                        </div>
+                    </div>
+                    {% endfor %}
+                </div>
+
+                <!-- Controls -->
+                <div class="controls-panel" style="margin-top: 20px;">
+                    <div class="controls-title">Notifications</div>
+                    <label class="toggle-control">
+                        <input type="checkbox" id="browserNotifToggle">
+                        <span class="toggle-slider"></span>
+                        Browser Notifications
+                    </label>
+                    <label class="toggle-control">
+                        <input type="checkbox" id="audioAlertToggle" checked>
+                        <span class="toggle-slider"></span>
+                        Audio Alerts
+                    </label>
+                    <button class="test-btn" id="testSoundBtn">Test Sound</button>
+                </div>
+            </div>
+
+            <!-- Right: Status Log -->
+            <div class="main-right">
+                <div class="log-panel">
+                    <div class="log-header">
+                        <span>Status History</span>
+                        <span class="log-count" id="logCount">0 events</span>
+                    </div>
+                    <div class="log-entries" id="logEntries">
+                        <div class="log-empty" id="logEmpty">
+                            No status changes yet. Events appear here when a station switches between Available and In Use.
+                        </div>
+                    </div>
+                </div>
+            </div>
+        </div>
+    </div>
+
+    <!-- Socket.IO -->
+    <script src="https://cdn.socket.io/4.7.5/socket.io.min.js"></script>
+    <script>
+    (function() {
+        'use strict';
+
+        // --- Audio context for alert sounds ---
+        let audioCtx = null;
+        function getAudioCtx() {
+            if (!audioCtx) audioCtx = new (window.AudioContext || window.webkitAudioContext)();
+            return audioCtx;
+        }
+        function playBeep(freq, duration) {
+            try {
+                const ctx = getAudioCtx();
+                const osc = ctx.createOscillator();
+                const gain = ctx.createGain();
+                osc.connect(gain);
+                gain.connect(ctx.destination);
+                osc.frequency.value = freq;
+                osc.type = 'sine';
+                gain.gain.setValueAtTime(0.3, ctx.currentTime);
+                gain.gain.exponentialRampToValueAtTime(0.01, ctx.currentTime + duration / 1000);
+                osc.start();
+                osc.stop(ctx.currentTime + duration / 1000);
+            } catch (e) {}
+        }
+        function playAlertSound() {
+            playBeep(523, 200);
+            setTimeout(() => playBeep(659, 200), 250);
+            setTimeout(() => playBeep(784, 300), 500);
+        }
+
+        // --- WebSocket ---
+        const socket = io();
+        const connDot = document.getElementById('connDot');
+        const connText = document.getElementById('connText');
+
+        socket.on('connect', () => {
+            connDot.className = 'connection-dot connected';
+            connText.textContent = 'Connected';
+        });
+        socket.on('disconnect', () => {
+            connDot.className = 'connection-dot disconnected';
+            connText.textContent = 'Disconnected';
+        });
+        socket.on('reconnecting', () => {
+            connDot.className = 'connection-dot';
+            connText.textContent = 'Reconnecting...';
+        });
+
+        // --- State ---
+        let eventCount = 0;
+
+        // --- Initial state ---
+        socket.on('initial_state', (data) => {
+            for (const [stationId, info] of Object.entries(data.statuses)) {
+                updateCard(stationId, info.status, info.last_check, false);
+            }
+            // Only show history from the last 30 minutes
+            const cutoff = Date.now() - 30 * 60 * 1000;
+            const recent = data.history.filter(e => new Date(e.timestamp).getTime() > cutoff);
+            renderHistory(recent);
+        });
+
+        // --- Real-time updates ---
+        socket.on('status_update', (data) => {
+            updateCard(data.station_id, data.new_status, data.timestamp, true);
+            addLogEntry(data);
+
+            if (data.new_status === 'available') {
+                if (document.getElementById('audioAlertToggle').checked) {
+                    playAlertSound();
+                }
+                if (document.getElementById('browserNotifToggle').checked) {
+                    showNotification(data.station_name);
+                }
+            }
+        });
+
+        // --- Per-check updates (updates last check time even without status change) ---
+        socket.on('station_checked', (data) => {
+            updateCard(data.station_id, data.status, data.last_check, false);
+        });
+
+        // --- Cycle progress bar ---
+        const cycleLabel = document.getElementById('cycleLabel');
+        const cycleFill = document.getElementById('cycleFill');
+        const cycleTime = document.getElementById('cycleTime');
+        let countdownInterval = null;
+
+        function startScanning() {
+            cycleLabel.textContent = 'Scanning stations...';
+            cycleFill.style.width = '100%';
+            cycleFill.classList.add('scanning');
+            cycleFill.classList.remove('countdown');
+            cycleTime.textContent = '';
+        }
+
+        socket.on('cycle_complete', (data) => {
+            const interval = data.interval;
+            cycleFill.classList.remove('scanning');
+            startCountdown(interval);
+        });
+
+        function startCountdown(seconds) {
+            if (countdownInterval) clearInterval(countdownInterval);
+            let remaining = seconds;
+            cycleLabel.textContent = 'Next check in';
+            cycleFill.style.transition = 'none';
+            cycleFill.style.width = '100%';
+            // Force reflow then animate
+            void cycleFill.offsetWidth;
+            cycleFill.style.transition = `width ${seconds}s linear`;
+            cycleFill.style.width = '0%';
+            cycleTime.textContent = remaining + 's';
+
+            countdownInterval = setInterval(() => {
+                remaining--;
+                if (remaining <= 0) {
+                    clearInterval(countdownInterval);
+                    countdownInterval = null;
+                    startScanning();
+                } else {
+                    cycleTime.textContent = remaining + 's';
+                }
+            }, 1000);
+        }
+
+        // --- Update station card ---
+        const lastCheckTimes = {};
+
+        function updateCard(stationId, status, lastCheck, animate) {
+            const card = document.querySelector(`[data-station-id="${stationId}"]`);
+            if (!card) return;
+
+            card.classList.remove('status-available', 'status-in-use', 'status-unknown', 'status-error');
+            const statusClass = 'status-' + status.replace('_', '-');
+            card.classList.add(statusClass);
+
+            const textMap = {
+                'available': 'Available',
+                'in_use': 'In Use',
+                'unknown': 'Checking...',
+                'error': 'Error'
+            };
+            card.querySelector('.status-text').textContent = textMap[status] || status;
+
+            if (lastCheck) {
+                lastCheckTimes[stationId] = new Date(lastCheck);
+                updateTimeAgo(card, lastCheckTimes[stationId]);
+            }
+
+            if (animate && status === 'available') {
+                card.classList.remove('flash-available');
+                void card.offsetWidth;
+                card.classList.add('flash-available');
+            }
+        }
+
+        function updateTimeAgo(card, date) {
+            const secs = Math.floor((Date.now() - date.getTime()) / 1000);
+            let text;
+            if (secs < 5) text = 'just now';
+            else if (secs < 60) text = secs + 's ago';
+            else text = Math.floor(secs / 60) + 'm ago';
+            const time = date.toLocaleTimeString('he-IL', { hour: '2-digit', minute: '2-digit', second: '2-digit' });
+            card.querySelector('.last-check').textContent = time + '  ·  ' + text;
+        }
+
+        // Update "time ago" every 5 seconds
+        setInterval(() => {
+            for (const [id, date] of Object.entries(lastCheckTimes)) {
+                const card = document.querySelector(`[data-station-id="${id}"]`);
+                if (card) updateTimeAgo(card, date);
+            }
+        }, 5000);
+
+        // --- History ---
+        function renderHistory(history) {
+            const container = document.getElementById('logEntries');
+            const empty = document.getElementById('logEmpty');
+            if (history.length === 0) {
+                if (empty) empty.style.display = '';
+                return;
+            }
+            if (empty) empty.style.display = 'none';
+            container.innerHTML = '';
+            // Show newest first
+            for (let i = history.length - 1; i >= 0; i--) {
+                appendLogEntry(container, history[i], false);
+            }
+            eventCount = history.length;
+            updateLogCount();
+        }
+
+        function addLogEntry(data) {
+            const container = document.getElementById('logEntries');
+            const empty = document.getElementById('logEmpty');
+            if (empty) empty.style.display = 'none';
+            appendLogEntry(container, data, true);
+            eventCount++;
+            updateLogCount();
+
+            // Keep max 50 in DOM
+            while (container.children.length > 50) {
+                container.removeChild(container.lastChild);
+            }
+        }
+
+        function appendLogEntry(container, data, prepend) {
+            const d = new Date(data.timestamp);
+            const time = d.toLocaleTimeString('he-IL', { hour: '2-digit', minute: '2-digit', second: '2-digit' });
+            const dotClass = data.new_status === 'available' ? 'available' : data.new_status === 'in_use' ? 'in-use' : 'unknown';
+            const actionText = data.new_status === 'available' ? 'became <strong>available</strong>' : data.new_status === 'in_use' ? 'is now <strong>in use</strong>' : 'status <strong>unknown</strong>';
+
+            const entry = document.createElement('div');
+            entry.className = 'log-entry';
+            entry.innerHTML = `
+                <span class="log-time">${time}</span>
+                <span class="log-dot ${dotClass}"></span>
+                <span class="log-text">${data.station_name} ${actionText}</span>
+            `;
+
+            if (prepend) {
+                container.prepend(entry);
+            } else {
+                container.appendChild(entry);
+            }
+        }
+
+        function updateLogCount() {
+            document.getElementById('logCount').textContent = eventCount + ' event' + (eventCount !== 1 ? 's' : '');
+        }
+
+        // --- Browser notifications ---
+        document.getElementById('browserNotifToggle').addEventListener('change', function() {
+            if (this.checked && 'Notification' in window && Notification.permission === 'default') {
+                Notification.requestPermission();
+            }
+        });
+
+        function showNotification(stationName) {
+            if (!('Notification' in window)) return;
+            if (Notification.permission !== 'granted') return;
+            new Notification('EV Station Available!', {
+                body: stationName + ' is now available for charging',
+                icon: '/static/icon-192.png',
+                tag: 'ev-available',
+                requireInteraction: true,
+            });
+        }
+
+        // --- Test sound button ---
+        document.getElementById('testSoundBtn').addEventListener('click', () => {
+            playAlertSound();
+        });
+
+        // --- Persist toggles ---
+        const audioToggle = document.getElementById('audioAlertToggle');
+        const notifToggle = document.getElementById('browserNotifToggle');
+
+        const savedAudio = localStorage.getItem('ev_audio_alert');
+        if (savedAudio !== null) audioToggle.checked = savedAudio === 'true';
+        const savedNotif = localStorage.getItem('ev_browser_notif');
+        if (savedNotif !== null) notifToggle.checked = savedNotif === 'true';
+
+        audioToggle.addEventListener('change', () => localStorage.setItem('ev_audio_alert', audioToggle.checked));
+        notifToggle.addEventListener('change', () => localStorage.setItem('ev_browser_notif', notifToggle.checked));
+    })();
+    </script>
+</body>
+</html>
