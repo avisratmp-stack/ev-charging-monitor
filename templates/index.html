@@ -238,6 +238,28 @@
             direction: ltr;
         }
 
+        /* --- In-Use Duration Badge --- */
+        .in-use-duration {
+            display: none;
+            align-items: center;
+            gap: 6px;
+            margin-top: 12px;
+            padding: 8px 12px;
+            background: var(--in-use-bg);
+            border-radius: var(--radius-xs);
+            font-size: 0.78rem;
+            color: var(--in-use);
+            font-weight: 500;
+        }
+        .in-use-duration svg {
+            width: 14px;
+            height: 14px;
+            flex-shrink: 0;
+        }
+        .status-in-use .in-use-duration {
+            display: flex;
+        }
+
         /* --- Controls Panel --- */
         .controls-panel {
             background: var(--bg-secondary);
@@ -519,6 +541,12 @@
                                     <span class="status-text">Checking...</span>
                                 </div>
                             </div>
+                            <div class="in-use-duration">
+                                <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
+                                    <circle cx="12" cy="12" r="10"/><polyline points="12 6 12 12 16 14"/>
+                                </svg>
+                                <span class="duration-text">In use for --</span>
+                            </div>
                             <div class="card-meta">
                                 <span class="last-check">Waiting for first check...</span>
                             </div>
@@ -618,7 +646,7 @@
         // --- Initial state ---
         socket.on('initial_state', (data) => {
             for (const [stationId, info] of Object.entries(data.statuses)) {
-                updateCard(stationId, info.status, info.last_check, false);
+                updateCard(stationId, info.status, info.last_check, false, info.in_use_since);
             }
             // Only show history from the last 30 minutes
             const cutoff = Date.now() - 30 * 60 * 1000;
@@ -643,7 +671,7 @@
 
         // --- Per-check updates (updates last check time even without status change) ---
         socket.on('station_checked', (data) => {
-            updateCard(data.station_id, data.status, data.last_check, false);
+            updateCard(data.station_id, data.status, data.last_check, false, data.in_use_since);
         });
 
         // --- Cycle progress bar ---
@@ -692,8 +720,9 @@
 
         // --- Update station card ---
         const lastCheckTimes = {};
+        const inUseSinceTimes = {};
 
-        function updateCard(stationId, status, lastCheck, animate) {
+        function updateCard(stationId, status, lastCheck, animate, inUseSince) {
             const card = document.querySelector(`[data-station-id="${stationId}"]`);
             if (!card) return;
 
@@ -714,6 +743,14 @@
                 updateTimeAgo(card, lastCheckTimes[stationId]);
             }
 
+            // Track in-use duration
+            if (status === 'in_use' && inUseSince) {
+                inUseSinceTimes[stationId] = new Date(inUseSince);
+                updateDuration(card, inUseSinceTimes[stationId]);
+            } else if (status !== 'in_use') {
+                delete inUseSinceTimes[stationId];
+            }
+
             if (animate && status === 'available') {
                 card.classList.remove('flash-available');
                 void card.offsetWidth;
@@ -731,11 +768,28 @@
             card.querySelector('.last-check').textContent = time + '  ·  ' + text;
         }
 
-        // Update "time ago" every 5 seconds
+        function updateDuration(card, sinceDate) {
+            const el = card.querySelector('.duration-text');
+            if (!el) return;
+            const totalSecs = Math.floor((Date.now() - sinceDate.getTime()) / 1000);
+            if (totalSecs < 0) { el.textContent = 'In use for --'; return; }
+            const hours = Math.floor(totalSecs / 3600);
+            const mins = Math.floor((totalSecs % 3600) / 60);
+            let text = 'In use for ';
+            if (hours > 0) text += hours + 'h ';
+            text += mins + 'm';
+            el.textContent = text;
+        }
+
+        // Update "time ago" and "in use duration" every 5 seconds
         setInterval(() => {
             for (const [id, date] of Object.entries(lastCheckTimes)) {
                 const card = document.querySelector(`[data-station-id="${id}"]`);
                 if (card) updateTimeAgo(card, date);
+            }
+            for (const [id, date] of Object.entries(inUseSinceTimes)) {
+                const card = document.querySelector(`[data-station-id="${id}"]`);
+                if (card) updateDuration(card, date);
             }
         }, 5000);
 

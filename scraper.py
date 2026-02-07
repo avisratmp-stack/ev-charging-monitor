@@ -22,6 +22,7 @@ class StationScraper:
 
         self._lock = threading.Lock()
         self._statuses = {}
+        self._in_use_since = {}  # track when each station entered "in_use"
         self._history = []
         self._running = False
         self._driver = None
@@ -101,9 +102,16 @@ class StationScraper:
                         old_entry = self._statuses.get(station["id"])
                         old_status = old_entry["status"] if old_entry else None
 
+                        # Track when station entered "in_use"
+                        if new_status == "in_use" and old_status != "in_use":
+                            self._in_use_since[station["id"]] = now
+                        elif new_status != "in_use":
+                            self._in_use_since.pop(station["id"], None)
+
                         self._statuses[station["id"]] = {
                             "status": new_status,
                             "last_check": now,
+                            "in_use_since": self._in_use_since.get(station["id"]),
                         }
 
                         if old_status != new_status:
@@ -120,8 +128,9 @@ class StationScraper:
 
                     # Always notify UI of the latest check time
                     if self.on_station_checked:
+                        in_use_since = self._in_use_since.get(station["id"])
                         self.on_station_checked(
-                            station["id"], new_status, now
+                            station["id"], new_status, now, in_use_since
                         )
 
                     if old_status != new_status:

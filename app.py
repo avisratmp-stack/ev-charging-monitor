@@ -40,11 +40,12 @@ def on_status_change(station_id, station_name, old_status, new_status, timestamp
     logger.info(f"{station_name}: {old_status} -> {new_status}")
 
 
-def on_station_checked(station_id, status, timestamp):
+def on_station_checked(station_id, status, timestamp, in_use_since=None):
     socketio.emit("station_checked", {
         "station_id": station_id,
         "status": status,
         "last_check": timestamp,
+        "in_use_since": in_use_since,
     })
 
 
