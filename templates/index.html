@@ -490,6 +490,160 @@
             text-align: left;
             direction: ltr;
         }
+
+        /* --- Gantt Chart --- */
+        .gantt-section {
+            margin-top: 24px;
+        }
+        .gantt-panel {
+            background: var(--bg-secondary);
+            border: 1px solid var(--border);
+            border-radius: var(--radius);
+            overflow: hidden;
+        }
+        .gantt-header {
+            padding: 16px 20px 12px;
+            font-size: 0.9rem;
+            font-weight: 600;
+            border-bottom: 1px solid var(--border);
+            display: flex;
+            align-items: center;
+            justify-content: space-between;
+        }
+        .gantt-range-btns {
+            display: flex;
+            gap: 4px;
+        }
+        .gantt-range-btn {
+            background: var(--bg-tertiary);
+            border: 1px solid var(--border);
+            color: var(--text-secondary);
+            padding: 4px 10px;
+            border-radius: var(--radius-xs);
+            font-size: 0.72rem;
+            font-family: inherit;
+            cursor: pointer;
+            transition: background 0.2s, color 0.2s;
+        }
+        .gantt-range-btn.active {
+            background: var(--accent);
+            color: #fff;
+            border-color: var(--accent);
+        }
+        .gantt-range-btn:hover:not(.active) {
+            background: var(--bg-hover);
+        }
+        .gantt-body {
+            padding: 16px 20px;
+            overflow-x: auto;
+        }
+        .gantt-chart {
+            min-width: 600px;
+        }
+        .gantt-time-axis {
+            display: flex;
+            justify-content: space-between;
+            margin-bottom: 8px;
+            margin-right: 0;
+            margin-left: 120px;
+            direction: ltr;
+        }
+        .gantt-time-label {
+            font-size: 0.65rem;
+            color: var(--text-muted);
+            font-variant-numeric: tabular-nums;
+            text-align: center;
+            min-width: 40px;
+        }
+        .gantt-row {
+            display: flex;
+            align-items: center;
+            margin-bottom: 6px;
+            direction: ltr;
+        }
+        .gantt-station-label {
+            width: 120px;
+            flex-shrink: 0;
+            font-size: 0.75rem;
+            font-weight: 500;
+            color: var(--text-secondary);
+            text-align: right;
+            padding-left: 8px;
+            white-space: nowrap;
+            overflow: hidden;
+            text-overflow: ellipsis;
+            direction: rtl;
+        }
+        .gantt-bar-track {
+            flex: 1;
+            height: 22px;
+            background: var(--bg-tertiary);
+            border-radius: 4px;
+            position: relative;
+            overflow: hidden;
+        }
+        .gantt-bar-segment {
+            position: absolute;
+            top: 0;
+            height: 100%;
+            border-radius: 2px;
+            min-width: 1px;
+        }
+        .gantt-bar-segment.available {
+            background: var(--available);
+            opacity: 0.7;
+        }
+        .gantt-bar-segment.in_use {
+            background: var(--in-use);
+            opacity: 0.7;
+        }
+        .gantt-bar-segment.unknown, .gantt-bar-segment.error {
+            background: var(--unknown);
+            opacity: 0.5;
+        }
+        .gantt-bar-segment:hover {
+            opacity: 1;
+        }
+        .gantt-legend {
+            display: flex;
+            gap: 16px;
+            margin-top: 12px;
+            justify-content: center;
+        }
+        .gantt-legend-item {
+            display: flex;
+            align-items: center;
+            gap: 6px;
+            font-size: 0.72rem;
+            color: var(--text-secondary);
+        }
+        .gantt-legend-dot {
+            width: 10px;
+            height: 10px;
+            border-radius: 3px;
+        }
+        .gantt-legend-dot.available { background: var(--available); }
+        .gantt-legend-dot.in-use { background: var(--in-use); }
+        .gantt-legend-dot.unknown { background: var(--unknown); }
+        .gantt-empty {
+            text-align: center;
+            padding: 30px 20px;
+            color: var(--text-muted);
+            font-size: 0.82rem;
+        }
+        .gantt-tooltip {
+            position: fixed;
+            background: var(--text-primary);
+            color: var(--bg-secondary);
+            padding: 6px 10px;
+            border-radius: 6px;
+            font-size: 0.72rem;
+            pointer-events: none;
+            z-index: 1000;
+            white-space: nowrap;
+            display: none;
+            direction: ltr;
+        }
     </style>
 </head>
 <body>
@@ -587,7 +741,36 @@
                 </div>
             </div>
         </div>
+
+        <!-- Gantt Chart -->
+        <div class="gantt-section">
+            <div class="gantt-panel">
+                <div class="gantt-header">
+                    <span>Station Timeline</span>
+                    <div class="gantt-range-btns">
+                        <button class="gantt-range-btn" data-hours="6">6h</button>
+                        <button class="gantt-range-btn" data-hours="12">12h</button>
+                        <button class="gantt-range-btn active" data-hours="24">24h</button>
+                        <button class="gantt-range-btn" data-hours="48">2d</button>
+                        <button class="gantt-range-btn" data-hours="72">3d</button>
+                    </div>
+                </div>
+                <div class="gantt-body">
+                    <div class="gantt-chart" id="ganttChart">
+                        <div class="gantt-empty" id="ganttEmpty">Loading timeline data...</div>
+                    </div>
+                </div>
+                <div class="gantt-legend">
+                    <div class="gantt-legend-item"><span class="gantt-legend-dot available"></span> Available</div>
+                    <div class="gantt-legend-item"><span class="gantt-legend-dot in-use"></span> In Use</div>
+                    <div class="gantt-legend-item"><span class="gantt-legend-dot unknown"></span> Unknown</div>
+                </div>
+            </div>
+        </div>
     </div>
+
+    <!-- Tooltip for Gantt bars -->
+    <div class="gantt-tooltip" id="ganttTooltip"></div>
 
     <!-- Socket.IO -->
     <script src="https://cdn.socket.io/4.7.5/socket.io.min.js"></script>
@@ -692,6 +875,12 @@
             const interval = data.interval;
             cycleFill.classList.remove('scanning');
             startCountdown(interval);
+
+            // Play sound if ANY station is currently available
+            const anyAvailable = document.querySelector('.station-card.status-available');
+            if (anyAvailable && document.getElementById('audioAlertToggle').checked) {
+                playAlertSound();
+            }
         });
 
         function startCountdown(seconds) {
@@ -884,6 +1073,198 @@
 
         audioToggle.addEventListener('change', () => localStorage.setItem('ev_audio_alert', audioToggle.checked));
         notifToggle.addEventListener('change', () => localStorage.setItem('ev_browser_notif', notifToggle.checked));
+
+        // --- Gantt Chart ---
+        const STATION_ORDER = [
+            {% for station in stations %}
+            { id: '{{ station.id }}', name: '{{ station.name_he }}' },
+            {% endfor %}
+        ];
+
+        let ganttHours = 24;
+        let ganttEvents = [];
+
+        function fetchTimeline() {
+            fetch('/api/timeline')
+                .then(r => r.json())
+                .then(data => {
+                    ganttEvents = data;
+                    renderGantt();
+                })
+                .catch(err => console.error('Timeline fetch error:', err));
+        }
+
+        // Fetch timeline on load and every 60 seconds
+        fetchTimeline();
+        setInterval(fetchTimeline, 60000);
+
+        // Also refresh after each cycle
+        socket.on('cycle_complete', () => {
+            setTimeout(fetchTimeline, 2000);
+        });
+
+        // Range buttons
+        document.querySelectorAll('.gantt-range-btn').forEach(btn => {
+            btn.addEventListener('click', () => {
+                document.querySelectorAll('.gantt-range-btn').forEach(b => b.classList.remove('active'));
+                btn.classList.add('active');
+                ganttHours = parseInt(btn.dataset.hours);
+                renderGantt();
+            });
+        });
+
+        function renderGantt() {
+            const chart = document.getElementById('ganttChart');
+            const emptyEl = document.getElementById('ganttEmpty');
+            const now = Date.now();
+            const rangeMs = ganttHours * 3600 * 1000;
+            const rangeStart = now - rangeMs;
+
+            // Filter events within range (plus one before range for context)
+            const inRange = ganttEvents.filter(e => new Date(e.timestamp).getTime() >= rangeStart);
+
+            if (ganttEvents.length === 0) {
+                chart.innerHTML = '';
+                chart.appendChild(emptyEl);
+                emptyEl.style.display = '';
+                emptyEl.textContent = 'No timeline data yet. Data will appear after status changes are detected.';
+                return;
+            }
+
+            // Build segments per station
+            const stationSegments = {};
+            STATION_ORDER.forEach(s => { stationSegments[s.id] = []; });
+
+            // For each station, build timeline from events
+            STATION_ORDER.forEach(st => {
+                const stEvents = ganttEvents
+                    .filter(e => e.station_id === st.id)
+                    .sort((a, b) => new Date(a.timestamp) - new Date(b.timestamp));
+
+                if (stEvents.length === 0) {
+                    // No data - show as unknown for entire range
+                    stationSegments[st.id].push({
+                        status: 'unknown',
+                        start: rangeStart,
+                        end: now,
+                    });
+                    return;
+                }
+
+                // Find the last event before our range to know starting state
+                const allStEvents = ganttEvents
+                    .filter(e => e.station_id === st.id)
+                    .sort((a, b) => new Date(a.timestamp) - new Date(b.timestamp));
+
+                let startStatus = 'unknown';
+                for (const e of allStEvents) {
+                    const t = new Date(e.timestamp).getTime();
+                    if (t <= rangeStart) {
+                        startStatus = e.new_status;
+                    }
+                }
+
+                // Build segments
+                const segments = [];
+                let currentStatus = startStatus;
+                let segStart = rangeStart;
+
+                for (const e of stEvents) {
+                    const t = new Date(e.timestamp).getTime();
+                    if (t < rangeStart) {
+                        currentStatus = e.new_status;
+                        continue;
+                    }
+                    if (t > now) break;
+
+                    if (t > segStart) {
+                        segments.push({ status: currentStatus, start: segStart, end: t });
+                    }
+                    currentStatus = e.new_status;
+                    segStart = t;
+                }
+                // Final segment to now
+                if (segStart < now) {
+                    segments.push({ status: currentStatus, start: segStart, end: now });
+                }
+
+                stationSegments[st.id] = segments;
+            });
+
+            // Generate time axis labels
+            let tickCount;
+            if (ganttHours <= 6) tickCount = 6;
+            else if (ganttHours <= 12) tickCount = 6;
+            else if (ganttHours <= 24) tickCount = 8;
+            else if (ganttHours <= 48) tickCount = 8;
+            else tickCount = 6;
+
+            const tickInterval = rangeMs / tickCount;
+            let timeAxisHTML = '<div class="gantt-time-axis">';
+            for (let i = 0; i <= tickCount; i++) {
+                const t = new Date(rangeStart + i * tickInterval);
+                let label;
+                if (ganttHours > 24) {
+                    label = t.toLocaleDateString('he-IL', { day: '2-digit', month: '2-digit' }) + ' ' +
+                            t.toLocaleTimeString('he-IL', { hour: '2-digit', minute: '2-digit' });
+                } else {
+                    label = t.toLocaleTimeString('he-IL', { hour: '2-digit', minute: '2-digit' });
+                }
+                timeAxisHTML += `<span class="gantt-time-label">${label}</span>`;
+            }
+            timeAxisHTML += '</div>';
+
+            // Generate rows
+            let rowsHTML = '';
+            STATION_ORDER.forEach(st => {
+                const segments = stationSegments[st.id] || [];
+                let barsHTML = '';
+
+                segments.forEach(seg => {
+                    const left = Math.max(0, (seg.start - rangeStart) / rangeMs * 100);
+                    const width = Math.min(100 - left, (seg.end - seg.start) / rangeMs * 100);
+                    if (width < 0.05) return; // skip tiny slivers
+
+                    const startTime = new Date(seg.start).toLocaleTimeString('he-IL', { hour: '2-digit', minute: '2-digit' });
+                    const endTime = new Date(seg.end).toLocaleTimeString('he-IL', { hour: '2-digit', minute: '2-digit' });
+                    const durMins = Math.round((seg.end - seg.start) / 60000);
+                    const durText = durMins >= 60 ? Math.floor(durMins / 60) + 'h ' + (durMins % 60) + 'm' : durMins + 'm';
+                    const statusText = seg.status === 'available' ? 'Available' : seg.status === 'in_use' ? 'In Use' : 'Unknown';
+
+                    barsHTML += `<div class="gantt-bar-segment ${seg.status}" style="left:${left}%;width:${width}%"
+                        data-tip="${st.name} | ${statusText} | ${startTime}-${endTime} (${durText})"></div>`;
+                });
+
+                rowsHTML += `
+                    <div class="gantt-row">
+                        <div class="gantt-station-label">${st.name}</div>
+                        <div class="gantt-bar-track">${barsHTML}</div>
+                    </div>`;
+            });
+
+            chart.innerHTML = timeAxisHTML + rowsHTML;
+
+            // Tooltip handlers
+            const tooltip = document.getElementById('ganttTooltip');
+            chart.querySelectorAll('.gantt-bar-segment').forEach(seg => {
+                seg.addEventListener('mouseenter', (e) => {
+                    tooltip.textContent = seg.dataset.tip;
+                    tooltip.style.display = 'block';
+                });
+                seg.addEventListener('mousemove', (e) => {
+                    tooltip.style.left = (e.clientX + 12) + 'px';
+                    tooltip.style.top = (e.clientY - 30) + 'px';
+                });
+                seg.addEventListener('mouseleave', () => {
+                    tooltip.style.display = 'none';
+                });
+            });
+        }
+
+        // Also re-render gantt on status_update (new event happened)
+        socket.on('status_update', () => {
+            setTimeout(fetchTimeline, 1000);
+        });
     })();
     </script>
 </body>

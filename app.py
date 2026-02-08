@@ -5,6 +5,7 @@ from flask_socketio import SocketIO, emit
 import config
 from scraper import StationScraper
 from notifier import send_availability_email
+from timeline import TimelineStore
 
 logging.basicConfig(
     level=logging.INFO,
@@ -17,6 +18,7 @@ app.config["SECRET_KEY"] = config.SECRET_KEY
 app.config["TEMPLATES_AUTO_RELOAD"] = True
 app.jinja_env.auto_reload = True
 socketio = SocketIO(app, cors_allowed_origins="*", async_mode="threading")
+timeline_store = TimelineStore()
 
 
 @app.after_request
@@ -37,6 +39,7 @@ def on_status_change(station_id, station_name, old_status, new_status, timestamp
         "timestamp": timestamp,
     })
     send_availability_email(config, station_name, new_status, timestamp)
+    timeline_store.add_event(station_id, station_name, old_status, new_status, timestamp)
     logger.info(f"{station_name}: {old_status} -> {new_status}")
 
 
@@ -75,6 +78,11 @@ def api_status():
         "statuses": scraper.get_all_statuses(),
         "history": scraper.get_history(limit=50),
     })
+
+
+@app.route("/api/timeline")
+def api_timeline():
+    return jsonify(timeline_store.get_timeline())
 
 
 @socketio.on("connect")
