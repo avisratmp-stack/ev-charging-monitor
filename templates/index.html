@@ -1082,13 +1082,13 @@
         ];
 
         let ganttHours = 24;
-        let ganttEvents = [];
+        let ganttChecks = [];
 
         function fetchTimeline() {
             fetch('/api/timeline')
                 .then(r => r.json())
                 .then(data => {
-                    ganttEvents = data;
+                    ganttChecks = data;
                     renderGantt();
                 })
                 .catch(err => console.error('Timeline fetch error:', err));
@@ -1120,72 +1120,63 @@
             const rangeMs = ganttHours * 3600 * 1000;
             const rangeStart = now - rangeMs;
 
-            // Filter events within range (plus one before range for context)
-            const inRange = ganttEvents.filter(e => new Date(e.timestamp).getTime() >= rangeStart);
-
-            if (ganttEvents.length === 0) {
+            if (ganttChecks.length === 0) {
                 chart.innerHTML = '';
                 chart.appendChild(emptyEl);
                 emptyEl.style.display = '';
-                emptyEl.textContent = 'No timeline data yet. Data will appear after status changes are detected.';
+                emptyEl.textContent = 'No timeline data yet. Data will appear after the first check cycle completes.';
                 return;
             }
 
-            // Build segments per station
+            // Build segments per station from check records
+            // Each check record = { station_id, status, timestamp }
+            // We merge consecutive same-status checks into segments
             const stationSegments = {};
-            STATION_ORDER.forEach(s => { stationSegments[s.id] = []; });
 
-            // For each station, build timeline from events
             STATION_ORDER.forEach(st => {
-                const stEvents = ganttEvents
-                    .filter(e => e.station_id === st.id)
-                    .sort((a, b) => new Date(a.timestamp) - new Date(b.timestamp));
+                // Get all checks for this station, sorted by time
+                const checks = ganttChecks
+                    .filter(c => c.station_id === st.id)
+                    .map(c => ({ status: c.status, time: new Date(c.timestamp).getTime() }))
+                    .sort((a, b) => a.time - b.time);
 
-                if (stEvents.length === 0) {
-                    // No data - show as unknown for entire range
-                    stationSegments[st.id].push({
-                        status: 'unknown',
-                        start: rangeStart,
-                        end: now,
-                    });
+                if (checks.length === 0) {
+                    stationSegments[st.id] = [{
+                        status: 'unknown', start: rangeStart, end: now
+                    }];
                     return;
                 }
 
-                // Find the last event before our range to know starting state
-                const allStEvents = ganttEvents
-                    .filter(e => e.station_id === st.id)
-                    .sort((a, b) => new Date(a.timestamp) - new Date(b.timestamp));
-
-                let startStatus = 'unknown';
-                for (const e of allStEvents) {
-                    const t = new Date(e.timestamp).getTime();
-                    if (t <= rangeStart) {
-                        startStatus = e.new_status;
-                    }
-                }
-
-                // Build segments
+                // Build segments: each segment spans from one check to the next
                 const segments = [];
-                let currentStatus = startStatus;
-                let segStart = rangeStart;
+                for (let i = 0; i < checks.length; i++) {
+                    const checkTime = checks[i].time;
+                    const nextTime = (i < checks.length - 1) ? checks[i + 1].time : now;
+                    const status = checks[i].status;
 
-                for (const e of stEvents) {
-                    const t = new Date(e.timestamp).getTime();
-                    if (t < rangeStart) {
-                        currentStatus = e.new_status;
-                        continue;
-                    }
-                    if (t > now) break;
+                    // Skip checks entirely outside our range
+                    if (nextTime < rangeStart) continue;
+                    if (checkTime > now) break;
 
-                    if (t > segStart) {
-                        segments.push({ status: currentStatus, start: segStart, end: t });
+                    const segStart = Math.max(checkTime, rangeStart);
+                    const segEnd = Math.min(nextTime, now);
+
+                    if (segEnd <= segStart) continue;
+
+                    // Merge with previous segment if same status
+                    if (segments.length > 0 && segments[segments.length - 1].status === status) {
+                        segments[segments.length - 1].end = segEnd;
+                    } else {
+                        segments.push({ status, start: segStart, end: segEnd });
                     }
-                    currentStatus = e.new_status;
-                    segStart = t;
                 }
-                // Final segment to now
-                if (segStart < now) {
-                    segments.push({ status: currentStatus, start: segStart, end: now });
+
+                // If no segments in range, use last known status
+                if (segments.length === 0) {
+                    // Find last check before range
+                    const before = checks.filter(c => c.time <= rangeStart);
+                    const lastStatus = before.length > 0 ? before[before.length - 1].status : 'unknown';
+                    segments.push({ status: lastStatus, start: rangeStart, end: now });
                 }
 
                 stationSegments[st.id] = segments;
@@ -1223,7 +1214,7 @@
                 segments.forEach(seg => {
                     const left = Math.max(0, (seg.start - rangeStart) / rangeMs * 100);
                     const width = Math.min(100 - left, (seg.end - seg.start) / rangeMs * 100);
-                    if (width < 0.05) return; // skip tiny slivers
+                    if (width < 0.05) return;
 
                     const startTime = new Date(seg.start).toLocaleTimeString('he-IL', { hour: '2-digit', minute: '2-digit' });
                     const endTime = new Date(seg.end).toLocaleTimeString('he-IL', { hour: '2-digit', minute: '2-digit' });
@@ -1247,7 +1238,7 @@
             // Tooltip handlers
             const tooltip = document.getElementById('ganttTooltip');
             chart.querySelectorAll('.gantt-bar-segment').forEach(seg => {
-                seg.addEventListener('mouseenter', (e) => {
+                seg.addEventListener('mouseenter', () => {
                     tooltip.textContent = seg.dataset.tip;
                     tooltip.style.display = 'block';
                 });
@@ -1261,7 +1252,7 @@
             });
         }
 
-        // Also re-render gantt on status_update (new event happened)
+        // Also re-render gantt on status_update
         socket.on('status_update', () => {
             setTimeout(fetchTimeline, 1000);
         });

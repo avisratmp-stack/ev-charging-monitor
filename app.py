@@ -39,11 +39,15 @@ def on_status_change(station_id, station_name, old_status, new_status, timestamp
         "timestamp": timestamp,
     })
     send_availability_email(config, station_name, new_status, timestamp)
-    timeline_store.add_event(station_id, station_name, old_status, new_status, timestamp)
     logger.info(f"{station_name}: {old_status} -> {new_status}")
 
 
 def on_station_checked(station_id, status, timestamp, in_use_since=None):
+    # Record every check for the Gantt timeline
+    station = next((s for s in config.STATIONS if s["id"] == station_id), None)
+    station_name = station["name"] if station else station_id
+    timeline_store.record_check(station_id, station_name, status, timestamp)
+
     socketio.emit("station_checked", {
         "station_id": station_id,
         "status": status,
@@ -53,6 +57,9 @@ def on_station_checked(station_id, status, timestamp, in_use_since=None):
 
 
 def on_cycle_complete(interval):
+    # Save timeline to disk once per cycle
+    timeline_store.save_cycle()
+
     socketio.emit("cycle_complete", {
         "interval": interval,
     })
