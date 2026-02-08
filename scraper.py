@@ -3,13 +3,14 @@ import os
 import threading
 import time
 import logging
-from datetime import datetime
 
 from selenium import webdriver
 from selenium.webdriver.chrome.options import Options
 from selenium.webdriver.chrome.service import Service
 from selenium.common.exceptions import WebDriverException
 from webdriver_manager.chrome import ChromeDriverManager
+
+from config import now_il
 
 logger = logging.getLogger(__name__)
 
@@ -133,7 +134,7 @@ class StationScraper:
                         break
 
                     new_status = self._check_station(station)
-                    now = datetime.now().isoformat()
+                    now = now_il().isoformat()
 
                     with self._lock:
                         old_entry = self._statuses.get(station["id"])

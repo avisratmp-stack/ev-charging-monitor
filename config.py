@@ -1,4 +1,13 @@
 import os
+from datetime import datetime
+from zoneinfo import ZoneInfo
+
+IL_TZ = ZoneInfo("Asia/Jerusalem")
+
+
+def now_il():
+    """Return current datetime in Israel timezone."""
+    return datetime.now(IL_TZ)
 
 # --- Station Definitions (fixed list) ---
 STATIONS = [

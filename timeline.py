@@ -7,7 +7,9 @@ import json
 import os
 import threading
 import logging
-from datetime import datetime, timedelta
+from datetime import timedelta
+
+from config import now_il
 
 logger = logging.getLogger(__name__)
 
@@ -47,7 +49,7 @@ class TimelineStore:
 
     def _prune(self):
         """Remove records older than RETENTION_DAYS."""
-        cutoff = (datetime.now() - timedelta(days=RETENTION_DAYS)).isoformat()
+        cutoff = (now_il() - timedelta(days=RETENTION_DAYS)).isoformat()
         self._events = [e for e in self._events if e.get("timestamp", "") >= cutoff]
 
     def record_check(self, station_id, station_name, status, timestamp):
@@ -68,6 +70,6 @@ class TimelineStore:
 
     def get_timeline(self, days=RETENTION_DAYS):
         """Return check records from the last N days."""
-        cutoff = (datetime.now() - timedelta(days=days)).isoformat()
+        cutoff = (now_il() - timedelta(days=days)).isoformat()
         with self._lock:
             return [e for e in self._events if e.get("timestamp", "") >= cutoff]

@@ -2,14 +2,13 @@ import logging
 from flask import Flask, render_template, jsonify
 from flask_socketio import SocketIO, emit
 
-from datetime import datetime
-
 import config
+from config import now_il
 from scraper import StationScraper
 from notifier import send_availability_email
 from timeline import TimelineStore
 
-SW_VERSION = datetime.now().strftime("%Y%m%d-%H%M%S")
+SW_VERSION = now_il().strftime("%Y%m%d-%H%M%S")
 
 logging.basicConfig(
     level=logging.INFO,
