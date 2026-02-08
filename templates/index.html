@@ -656,9 +656,12 @@
                 </svg>
                 <h1>EV Charging Monitor</h1>
             </div>
-            <div class="connection-badge">
-                <span class="connection-dot" id="connDot"></span>
-                <span id="connText">Connecting...</span>
+            <div style="display:flex;align-items:center;gap:12px;">
+                <span style="font-size:0.62rem;color:var(--text-muted);font-variant-numeric:tabular-nums;">v{{ sw_version }}</span>
+                <div class="connection-badge">
+                    <span class="connection-dot" id="connDot"></span>
+                    <span id="connText">Connecting...</span>
+                </div>
             </div>
         </div>
     </header>
