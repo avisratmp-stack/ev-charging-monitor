@@ -3,3 +3,4 @@ __pycache__/
 .env
 .claude/
 timeline_data.json
+scraper_state.json

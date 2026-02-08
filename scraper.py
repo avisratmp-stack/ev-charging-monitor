@@ -1,3 +1,5 @@
+import json
+import os
 import threading
 import time
 import logging
@@ -10,6 +12,8 @@ from selenium.common.exceptions import WebDriverException
 from webdriver_manager.chrome import ChromeDriverManager
 
 logger = logging.getLogger(__name__)
+
+STATE_FILE = os.environ.get("SCRAPER_STATE_FILE", "scraper_state.json")
 
 
 class StationScraper:
@@ -28,6 +32,9 @@ class StationScraper:
         self._driver = None
         self._thread = None
         self._cycle_count = 0
+
+        # Restore persisted state from disk
+        self._load_state()
 
     def start(self):
         self._running = True
@@ -50,6 +57,36 @@ class StationScraper:
     def get_history(self, limit=50):
         with self._lock:
             return list(self._history[-limit:])
+
+    def _load_state(self):
+        """Restore statuses, in_use_since, and history from disk."""
+        if not os.path.exists(STATE_FILE):
+            return
+        try:
+            with open(STATE_FILE, "r", encoding="utf-8") as f:
+                data = json.load(f)
+            self._statuses = data.get("statuses", {})
+            self._in_use_since = data.get("in_use_since", {})
+            self._history = data.get("history", [])
+            logger.info(
+                f"Restored state: {len(self._statuses)} statuses, "
+                f"{len(self._history)} history events"
+            )
+        except Exception as e:
+            logger.error(f"Error loading scraper state: {e}")
+
+    def _save_state(self):
+        """Persist current statuses, in_use_since, and history to disk."""
+        try:
+            data = {
+                "statuses": self._statuses,
+                "in_use_since": self._in_use_since,
+                "history": self._history,
+            }
+            with open(STATE_FILE, "w", encoding="utf-8") as f:
+                json.dump(data, f, ensure_ascii=False)
+        except Exception as e:
+            logger.error(f"Error saving scraper state: {e}")
 
     def _init_driver(self):
         opts = Options()
@@ -143,6 +180,10 @@ class StationScraper:
                         )
 
                 self._cycle_count += 1
+
+                # Persist state to disk after each cycle
+                with self._lock:
+                    self._save_state()
 
                 # Notify UI that cycle is done, countdown begins
                 if self.on_cycle_complete:
