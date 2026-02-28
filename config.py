@@ -61,5 +61,8 @@ SMTP_PASS = os.environ.get("SMTP_PASS", "")
 SMTP_FROM = os.environ.get("SMTP_FROM", "")
 SMTP_TO = os.environ.get("SMTP_TO", "")  # comma-separated
 
+# --- Database ---
+DATABASE_URL = os.environ.get("DATABASE_URL", "")
+
 # --- Flask ---
 SECRET_KEY = os.environ.get("SECRET_KEY", "ev-charger-monitor-secret")

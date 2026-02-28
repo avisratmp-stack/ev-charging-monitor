@@ -4,6 +4,7 @@ from flask_socketio import SocketIO, emit
 
 import config
 from config import now_il
+import db
 from scraper import StationScraper
 from notifier import send_availability_email
 from timeline import TimelineStore
@@ -15,6 +16,9 @@ logging.basicConfig(
     format="%(asctime)s [%(levelname)s] %(message)s",
 )
 logger = logging.getLogger(__name__)
+
+if config.DATABASE_URL:
+    db.init_tables(config.DATABASE_URL)
 
 app = Flask(__name__)
 app.config["SECRET_KEY"] = config.SECRET_KEY

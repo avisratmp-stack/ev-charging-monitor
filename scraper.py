@@ -12,7 +12,9 @@ from selenium.webdriver.chrome.service import Service
 from selenium.common.exceptions import WebDriverException
 from webdriver_manager.chrome import ChromeDriverManager
 
+import config
 from config import now_il
+import db
 
 logger = logging.getLogger(__name__)
 
@@ -26,17 +28,17 @@ class StationScraper:
         self.on_status_change = on_status_change
         self.on_station_checked = on_station_checked
         self.on_cycle_complete = on_cycle_complete
+        self._db_url = config.DATABASE_URL
 
         self._lock = threading.Lock()
         self._statuses = {}
-        self._in_use_since = {}  # track when each station entered "in_use"
+        self._in_use_since = {}
         self._history = []
         self._running = False
         self._driver = None
         self._thread = None
         self._cycle_count = 0
 
-        # Restore persisted state from disk
         self._load_state()
 
     def start(self):
@@ -62,7 +64,18 @@ class StationScraper:
             return list(self._history[-limit:])
 
     def _load_state(self):
-        """Restore statuses, in_use_since, and history from disk."""
+        """Restore statuses, in_use_since, and history from DB or disk."""
+        if self._db_url:
+            statuses, in_use_since = db.load_statuses(self._db_url)
+            if statuses:
+                self._statuses = statuses
+                self._in_use_since = in_use_since
+                self._history = db.load_history(self._db_url)
+                logger.info(
+                    f"Restored from DB: {len(self._statuses)} statuses, "
+                    f"{len(self._history)} history events"
+                )
+                return
         if not os.path.exists(STATE_FILE):
             return
         try:
@@ -79,7 +92,11 @@ class StationScraper:
             logger.error(f"Error loading scraper state: {e}")
 
     def _save_state(self):
-        """Persist current statuses, in_use_since, and history to disk."""
+        """Persist current statuses, in_use_since, and history."""
+        if self._db_url:
+            db.save_statuses(self._db_url, self._statuses, self._in_use_since)
+            db.prune_history(self._db_url)
+            return
         try:
             data = {
                 "statuses": self._statuses,
@@ -166,6 +183,8 @@ class StationScraper:
                             self._history.append(event)
                             if len(self._history) > 200:
                                 self._history = self._history[-200:]
+                            if self._db_url:
+                                db.save_history_event(self._db_url, event)
 
                     # Always notify UI of the latest check time
                     if self.on_station_checked:

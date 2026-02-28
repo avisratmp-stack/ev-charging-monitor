@@ -2,3 +2,4 @@ flask
 flask-socketio
 selenium
 webdriver-manager
+psycopg2-binary
