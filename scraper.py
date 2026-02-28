@@ -4,6 +4,8 @@ import threading
 import time
 import logging
 
+os.environ["WDM_SSL_VERIFY"] = "0"
+
 from selenium import webdriver
 from selenium.webdriver.chrome.options import Options
 from selenium.webdriver.chrome.service import Service
@@ -97,6 +99,7 @@ class StationScraper:
         opts.add_argument("--disable-gpu")
         opts.add_argument("--window-size=1280,720")
         opts.add_argument("--lang=he")
+        opts.add_argument("--ignore-certificate-errors")
         service = Service(ChromeDriverManager().install())
         self._driver = webdriver.Chrome(service=service, options=opts)
         self._driver.set_page_load_timeout(30)

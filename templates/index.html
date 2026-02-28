@@ -828,6 +828,8 @@
 
         // --- State ---
         let eventCount = 0;
+        const audioToggle = document.getElementById('audioAlertToggle');
+        const notifToggle = document.getElementById('browserNotifToggle');
 
         // --- Initial state ---
         socket.on('initial_state', (data) => {
@@ -841,15 +843,18 @@
         });
 
         // --- Real-time updates ---
+        let newAvailableThisCycle = false;
+
         socket.on('status_update', (data) => {
             updateCard(data.station_id, data.new_status, data.timestamp, true);
             addLogEntry(data);
 
             if (data.new_status === 'available') {
-                if (document.getElementById('audioAlertToggle').checked) {
+                newAvailableThisCycle = true;
+                if (audioToggle.checked) {
                     playAlertSound();
                 }
-                if (document.getElementById('browserNotifToggle').checked) {
+                if (notifToggle.checked) {
                     showNotification(data.station_name);
                 }
             }
@@ -878,12 +883,7 @@
             const interval = data.interval;
             cycleFill.classList.remove('scanning');
             startCountdown(interval);
-
-            // Play sound if ANY station is currently available
-            const anyAvailable = document.querySelector('.station-card.status-available');
-            if (anyAvailable && document.getElementById('audioAlertToggle').checked) {
-                playAlertSound();
-            }
+            newAvailableThisCycle = false;
         });
 
         function startCountdown(seconds) {
@@ -1043,7 +1043,7 @@
         }
 
         // --- Browser notifications ---
-        document.getElementById('browserNotifToggle').addEventListener('change', function() {
+        notifToggle.addEventListener('change', function() {
             if (this.checked && 'Notification' in window && Notification.permission === 'default') {
                 Notification.requestPermission();
             }
@@ -1066,8 +1066,6 @@
         });
 
         // --- Persist toggles ---
-        const audioToggle = document.getElementById('audioAlertToggle');
-        const notifToggle = document.getElementById('browserNotifToggle');
 
         const savedAudio = localStorage.getItem('ev_audio_alert');
         if (savedAudio !== null) audioToggle.checked = savedAudio === 'true';
