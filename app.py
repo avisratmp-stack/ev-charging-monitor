@@ -90,7 +90,7 @@ def index():
 def api_status():
     return jsonify({
         "statuses": scraper.get_all_statuses(),
-        "history": scraper.get_history(limit=50),
+        "history": scraper.get_history(limit=5),
     })
 
 
@@ -103,7 +103,7 @@ def api_timeline():
 def handle_connect():
     emit("initial_state", {
         "statuses": scraper.get_all_statuses(),
-        "history": scraper.get_history(limit=50),
+        "history": scraper.get_history(limit=5),
     })
 
 
@@ -111,7 +111,7 @@ def handle_connect():
 def handle_refresh():
     emit("initial_state", {
         "statuses": scraper.get_all_statuses(),
-        "history": scraper.get_history(limit=50),
+        "history": scraper.get_history(limit=5),
     })
 
 
